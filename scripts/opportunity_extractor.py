@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from dotenv import load_dotenv
 from google import genai
 
@@ -20,6 +21,23 @@ You are an expert startup analyst.
 
 Analyze the complaint and return ONLY valid JSON.
 
+Opportunity Score Rules:
+
+Return an integer between 1 and 10 only.
+
+1-3 = weak opportunity
+4-6 = moderate opportunity
+7-8 = strong opportunity
+9-10 = exceptional opportunity
+
+The score must consider:
+- severity
+- frequency
+- willingness to pay
+- competition level
+
+Lower competition should increase the score.
+
 Required format:
 
 {{
@@ -34,15 +52,22 @@ Complaint:
 {complaint}
 """
 
-try:
-    response = client.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=prompt
-    )
+for attempt in range(3):
 
-    print(response.text)
+    try:
 
-except Exception as e:
-    print(f"Error: {e}")
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=prompt
+        )
 
-print(response.text)
+        break
+
+    except Exception as e:
+
+        print(f"Attempt {attempt + 1} failed")
+
+        if attempt == 2:
+            raise
+
+        time.sleep(5)
