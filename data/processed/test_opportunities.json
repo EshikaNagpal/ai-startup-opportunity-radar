@@ -1,0 +1,32 @@
+[
+    {
+        "problem": "Customer feedback is scattered across platforms",
+        "category": "Customer Research",
+        "pain_type": "Productivity",
+        "severity": 8,
+        "frequency_estimate": 8,
+        "willingness_to_pay": 7,
+        "competition_level": 4,
+        "evidence_strength": 7
+    },
+    {
+        "problem": "Startup idea validation takes too long",
+        "category": "Startup Validation",
+        "pain_type": "Time",
+        "severity": 7,
+        "frequency_estimate": 8,
+        "willingness_to_pay": 8,
+        "competition_level": 6,
+        "evidence_strength": 8
+    },
+    {
+        "problem": "Tracking competitor pricing is exhausting",
+        "category": "Competitive Intelligence",
+        "pain_type": "Time",
+        "severity": 8,
+        "frequency_estimate": 7,
+        "willingness_to_pay": 8,
+        "competition_level": 5,
+        "evidence_strength": 7
+    }
+]
