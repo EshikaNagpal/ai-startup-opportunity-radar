@@ -1,4 +1,4 @@
-from scoring_engine import calculate_opportunity_score
+from scripts.scoring_engine import calculate_opportunity_score
 
 def rank_opportunities(opportunities):
     for opportunity in opportunities:
