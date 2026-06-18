@@ -9,8 +9,21 @@ client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
 
-with open("data/raw/reddit_posts.txt", "r", encoding="utf-8") as f:
-    complaints = [line.strip() for line in f.readlines() if line.strip()]
+INPUT_FILE = "data/raw/founder_complaints.txt"
+
+print(f"\nLoading data from: {INPUT_FILE}\n")
+
+with open(
+    INPUT_FILE,
+    "r",
+    encoding="utf-8"
+) as f:
+    complaints = [
+        line.strip()
+        for line in f.readlines()
+        if line.strip()
+    ]
+
 results = []
 
 for complaint in complaints:

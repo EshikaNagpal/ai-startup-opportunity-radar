@@ -3,10 +3,35 @@ import pandas as pd
 import streamlit as st
 
 from scripts.ranking_engine import rank_opportunities
+from scripts.recommendation_engine import generate_recommendation
 
 st.set_page_config(
     page_title="Founder Intelligence Platform",
     layout="wide"
+)
+
+st.sidebar.title("🚀 Founder Intelligence")
+
+st.sidebar.markdown("---")
+
+st.sidebar.markdown(
+    """
+    **Version:** 0.1
+
+    **Data Source:** Founder Dataset
+
+    **Opportunities:** 3
+    """
+)
+
+st.sidebar.markdown("---")
+
+page = st.sidebar.selectbox(
+    "Navigation",
+    [
+        "Dashboard",
+        "Opportunities"
+    ]
 )
 
 # Load opportunities
@@ -40,82 +65,137 @@ top_trend = max(
     key=category_counts.get
 )
 
-# Dashboard Header
-st.title("🚀 Founder Intelligence Platform")
-
-# Metrics
-col1, col2, col3 = st.columns(3)
-
-col1.metric(
-    "Opportunities",
-    len(ranked_opportunities)
+# Recommendation
+recommendation = generate_recommendation(
+    top_opportunity,
+    top_trend
 )
 
-col2.metric(
-    "Top Score",
-    top_opportunity["opportunity_score"]
-)
+# DASHBOARD PAGE
+if page == "Dashboard":
 
-col3.metric(
-    "Categories",
-    len(category_counts)
-)
+    st.title("🚀 Founder Intelligence Platform")
 
-st.divider()
+    col1, col2, col3 = st.columns(3)
 
-# Trend Section
-st.subheader("🔥 Top Trend")
-st.write(top_trend)
+    col1.metric(
+        "Opportunities",
+        len(ranked_opportunities)
+    )
 
-# Category Breakdown
-st.subheader("📊 Category Breakdown")
+    col2.metric(
+        "Top Score",
+        top_opportunity["opportunity_score"]
+    )
 
-category_df = pd.DataFrame(
-    {
-        "Category": list(category_counts.keys()),
-        "Mentions": list(category_counts.values())
-    }
-)
+    col3.metric(
+        "Categories",
+        len(category_counts)
+    )
 
-st.dataframe(
-    category_df,
-    use_container_width=True
-)
+    st.divider()
 
-st.bar_chart(
-    category_df.set_index("Category")
-)
+    left, right = st.columns(2)
 
-# Opportunity Section
-st.subheader("🏆 Top Opportunity")
+with left:
 
-st.write(top_opportunity["problem"])
+    st.subheader("🔥 Top Trend")
+    st.write(top_trend)
 
-st.write(
-    f"Category: {top_opportunity['category']}"
-)
+    st.subheader("📊 Category Breakdown")
 
-st.write(
-    f"Pain Type: {top_opportunity['pain_type']}"
-)
+    category_df = pd.DataFrame(
+        {
+            "Category": list(category_counts.keys()),
+            "Mentions": list(category_counts.values())
+        }
+    )
 
-st.write(
-    f"Opportunity Score: {top_opportunity['opportunity_score']}"
-)
+    st.bar_chart(
+        category_df.set_index("Category")
+    )
 
-# Full Rankings
-st.subheader("📋 Opportunity Rankings")
+with right:
 
-rankings_df = pd.DataFrame(ranked_opportunities)
+    st.subheader("🏆 Top Opportunity")
 
-st.dataframe(
-    rankings_df[
-        [
-            "problem",
-            "category",
-            "pain_type",
-            "opportunity_score"
-        ]
-    ],
-    use_container_width=True
-)
+    st.write(top_opportunity["problem"])
+
+    st.write(
+        f"Category: {top_opportunity['category']}"
+    )
+
+    st.write(
+        f"Pain Type: {top_opportunity['pain_type']}"
+    )
+
+    st.write(
+        f"Opportunity Score: {top_opportunity['opportunity_score']}"
+    )
+
+    st.subheader("💡 Founder Recommendation")
+
+    st.info(
+        f"""
+    Recommended Startup
+
+    {recommendation['startup_idea']}
+
+    Target Customer:
+    {recommendation['target_customer']}
+
+    Difficulty:
+    {recommendation['difficulty']}
+
+    Reason:
+    {recommendation['reason']}
+    """
+    )
+
+    st.subheader("🏆 Top Opportunity")
+
+    st.write(top_opportunity["problem"])
+
+    st.write(
+        f"Category: {top_opportunity['category']}"
+    )
+
+    st.write(
+        f"Pain Type: {top_opportunity['pain_type']}"
+    )
+
+    st.write(
+        f"Opportunity Score: {top_opportunity['opportunity_score']}"
+    )
+
+    st.subheader("💡 Founder Recommendation")
+
+    st.info(
+    f"""
+    Recommended Startup
+
+    {recommendation['startup_idea']}
+
+    Target Customer:
+    {recommendation['target_customer']}
+
+    Difficulty:
+    {recommendation['difficulty']}
+
+    Reason:
+    {recommendation['reason']}
+    """)
+    
+# OPPORTUNITIES PAGE
+if page == "Opportunities":
+
+    st.title("📋 Opportunity Rankings")
+
+    rankings_df = pd.DataFrame(
+        ranked_opportunities
+    )
+
+    st.dataframe(
+        rankings_df,
+        use_container_width=True
+    )
