@@ -1,1 +1,79 @@
-[]
+[
+    {
+        "problem": "Customer interviews are time-consuming and inefficient.",
+        "category": "Customer Discovery",
+        "pain_type": "Time",
+        "severity": 7,
+        "frequency_estimate": 8,
+        "willingness_to_pay": 6,
+        "competition_level": 4,
+        "evidence_strength": 7,
+        "opportunity_score": 68.0
+    },
+    {
+        "problem": "Customer feedback is scattered across multiple communication channels like Slack and email, making it difficult to track, organize, and act upon.",
+        "category": "Customer Relationship Management",
+        "pain_type": "Productivity",
+        "severity": 7,
+        "frequency_estimate": 8,
+        "willingness_to_pay": 6,
+        "competition_level": 4,
+        "evidence_strength": 7,
+        "opportunity_score": 68.0
+    },
+    {
+        "problem": "Customer feedback is scattered across multiple platforms, making it difficult to consolidate, analyze, and act upon.",
+        "category": "Customer Feedback Management",
+        "pain_type": "Productivity",
+        "severity": 7,
+        "frequency_estimate": 5,
+        "willingness_to_pay": 6,
+        "competition_level": 3,
+        "evidence_strength": 7,
+        "opportunity_score": 63.0
+    },
+    {
+        "problem": "Users request conflicting features, leading to design and development challenges.",
+        "category": "Product Development",
+        "pain_type": "Productivity",
+        "severity": 7,
+        "frequency_estimate": 6,
+        "willingness_to_pay": 5,
+        "competition_level": 3,
+        "evidence_strength": 4,
+        "opportunity_score": 57.5
+    },
+    {
+        "problem": "Lack of clarity and data-driven insights for feature prioritization, leading to inefficient resource allocation and potential development of less impactful features.",
+        "category": "Product Management",
+        "pain_type": "Productivity",
+        "severity": 7,
+        "frequency_estimate": 3,
+        "willingness_to_pay": 6,
+        "competition_level": 5,
+        "evidence_strength": 7,
+        "opportunity_score": 57.0
+    },
+    {
+        "problem": "Difficulty in tracking competitor product launches, leading to missed market opportunities and reactive strategies.",
+        "category": "Market Intelligence",
+        "pain_type": "Productivity",
+        "severity": 7,
+        "frequency_estimate": 5,
+        "willingness_to_pay": 6,
+        "competition_level": 8,
+        "evidence_strength": 6,
+        "opportunity_score": 56.5
+    },
+    {
+        "problem": "Uncertainty about customer willingness to pay for a product or service.",
+        "category": "Market Validation",
+        "pain_type": "Money",
+        "severity": 4,
+        "frequency_estimate": 5,
+        "willingness_to_pay": 5,
+        "competition_level": 2,
+        "evidence_strength": 3,
+        "opportunity_score": 47.5
+    }
+]

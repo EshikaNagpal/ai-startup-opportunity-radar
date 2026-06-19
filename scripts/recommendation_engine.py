@@ -1,29 +1,37 @@
+print("NEW RECOMMENDATION ENGINE LOADED")
 def generate_recommendation(
     top_opportunity,
     top_trend
 ):
 
-    if top_trend == "Customer Research":
+    if (
+        "Customer" in top_trend
+        or "Feedback" in top_trend
+        or "Discovery" in top_trend
+    ):
 
         return {
             "startup_idea":
-                "Customer Feedback Intelligence Platform",
+                "AI Customer Discovery Platform",
 
             "target_customer":
-                "Startup Founders and Product Managers",
+                "Startup Founders and Product Teams",
 
             "difficulty":
                 "Medium",
 
             "reason":
-                "Customer research pain appears frequently and shows strong business value."
+                "Customer research and feedback problems appear repeatedly across the dataset."
         }
 
-    elif top_trend == "Competitive Intelligence":
+    elif (
+        "Competitor" in top_trend
+        or "Market Intelligence" in top_trend
+    ):
 
         return {
             "startup_idea":
-                "Competitor Monitoring Platform",
+                "Competitor Intelligence Platform",
 
             "target_customer":
                 "Founders and Growth Teams",
@@ -32,10 +40,13 @@ def generate_recommendation(
                 "Medium",
 
             "reason":
-                "Companies constantly track competitors manually."
+                "Companies spend significant time manually tracking competitors and market movements."
         }
 
-    elif top_trend == "Startup Validation":
+    elif (
+        "Validation" in top_trend
+        or "Market Validation" in top_trend
+    ):
 
         return {
             "startup_idea":
@@ -48,21 +59,21 @@ def generate_recommendation(
                 "High",
 
             "reason":
-                "Idea validation is a recurring founder pain."
+                "Validating startup ideas remains a recurring and costly founder problem."
         }
 
     else:
 
         return {
             "startup_idea":
-                "Investigate Further",
+                "Founder Workflow Automation Platform",
 
             "target_customer":
-                "Unknown",
+                "Startup Founders",
 
             "difficulty":
-                "Unknown",
+                "Medium",
 
             "reason":
-                "Not enough information available."
+                "Multiple operational pain points suggest demand for workflow automation."
         }
