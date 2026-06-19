@@ -174,7 +174,7 @@ if page == "Dashboard":
 
         st.subheader("🤖 Recommended Startup")
 
-    st.markdown(
+        st.markdown(
     f"""
 ### {recommendation['startup_idea']}
 
@@ -413,7 +413,7 @@ Competitor pricing changes constantly
 
                 st.subheader("Analysis")
 
-            st.json(result)
+                st.json(result)
 
             st.subheader(
                 "Preview"
