@@ -174,7 +174,7 @@ if page == "Dashboard":
 
         st.subheader("🤖 Recommended Startup")
 
-st.markdown(
+    st.markdown(
     f"""
 ### {recommendation['startup_idea']}
 
@@ -407,7 +407,7 @@ Competitor pricing changes constantly
 
                 result = analyze_complaint(complaint)
 
-            results.append(result)
+                results.append(result)
 
             for result in results:
 
