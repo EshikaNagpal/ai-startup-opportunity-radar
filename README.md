@@ -37,3 +37,29 @@ Help founders identify validated startup opportunities using AI instead of relyi
 * Founder dashboard
 * Automated reports
 * Public launch
+
+
+# Founder Intelligence Platform
+
+AI-powered startup opportunity discovery platform.
+
+## Features
+
+- Opportunity ranking engine
+- AI startup recommendations
+- Founder complaint analysis
+- Interactive dashboard
+- Opportunity explorer
+
+## Tech Stack
+
+- Python
+- Streamlit
+- Pandas
+- Gemini API
+
+## Run
+
+pip install -r requirements.txt
+
+streamlit run app/dashboard.py

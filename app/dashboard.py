@@ -1,293 +1,522 @@
+"""
+Founder Intelligence Platform — UI layer.
+
+This file owns presentation only. Every call into scripts/ (ranking_engine,
+recommendation_engine, ai_advisor_engine, live_analyzer, scoring_engine) is
+untouched — same functions, same arguments, same fallback behavior on
+exceptions. Nothing here changes what the backend computes, only how it's
+displayed.
+"""
+
 import json
+import re
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
 from scripts.ranking_engine import rank_opportunities
 from scripts.recommendation_engine import generate_recommendation
-from scripts.ai_advisor_engine import (generate_ai_advice)
-from scripts.live_analyzer import (analyze_complaint)
+from scripts.ai_advisor_engine import generate_ai_advice
+from scripts.live_analyzer import analyze_complaint
+
 st.set_page_config(
     page_title="Founder Intelligence Platform",
-    layout="wide"
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# =====================================
-# SIDEBAR
-# =====================================
+# =====================================================================
+# DESIGN SYSTEM
+# =====================================================================
 
-st.sidebar.markdown("""
-# 🚀 Founder Intelligence
+def load_css(path: str = "assets/styles.css") -> None:
+    """Inject the design-system stylesheet. Run streamlit from the project
+    root so this relative path resolves the same way data/processed does."""
+    css_file = Path(path)
+    if css_file.exists():
+        st.markdown(f"<style>{css_file.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+    else:
+        st.warning(f"Stylesheet not found at '{path}'. Run `streamlit run` from the project root.")
 
-AI-powered startup opportunity discovery
-""")
+load_css()
 
-page = st.sidebar.selectbox(
-    "Navigation",
-    [
-        "Dashboard",
-        "Opportunities",
-        "AI Advisor",
-        "Analyze Complaints"
-    ]
-)
 
-# =====================================
-# LOAD DATA
-# =====================================
+def render_html(html: str) -> None:
+    """Render a raw HTML string via st.markdown, safely.
+
+    Streamlit's markdown parser follows standard Markdown rules: a blank
+    line followed by 4+ spaces of indentation is read as a *code block*,
+    not HTML — so indented multi-line HTML (which is what every f-string
+    template below produces) can randomly drop out of "raw HTML" mode and
+    print literal tags like `</div>` as visible text. Collapsing the
+    string to a single line (no newlines, no inter-tag whitespace) makes
+    that ambiguity impossible. Spacing between elements is handled by CSS
+    `gap` in the stylesheet, not by literal whitespace, so this is safe.
+    """
+    st.markdown(re.sub(r">\s+<", "><", html.strip()), unsafe_allow_html=True)
+
+
+NAV_ITEMS = ["Dashboard", "Opportunities", "AI Advisor", "Analyze Complaints"]
+NAV_ICONS = {
+    "Dashboard": "🏠",
+    "Opportunities": "📋",
+    "AI Advisor": "🤖",
+    "Analyze Complaints": "📝",
+}
+
+PAIN_COLORS = {
+    "Time": "#22d3ee",
+    "Money": "#34d399",
+    "Productivity": "#6d5dfb",
+    "Trust": "#fbbf67",
+    "Compliance": "#fb7185",
+    "Emotional": "#f472b6",
+    "Unknown": "#9a9cab",
+}
+
+ADVICE_ICONS = {
+    "startup idea": "💡",
+    "target customer": "🎯",
+    "difficulty": "⚙️",
+    "why now": "📈",
+    "go-to-market": "🚀",
+    "go to market": "🚀",
+}
+
+# =====================================================================
+# SESSION STATE
+# =====================================================================
+
+if "ai_calls" not in st.session_state:
+    st.session_state.ai_calls = 0
+if "selected_problem" not in st.session_state:
+    st.session_state.selected_problem = None
+if "complaint_results" not in st.session_state:
+    st.session_state.complaint_results = []
+
+# =====================================================================
+# DATA LOADING  (unchanged logic)
+# =====================================================================
 
 with open(
     "data/processed/opportunities.json",
     "r",
-    encoding="utf-8"
+    encoding="utf-8",
 ) as f:
     opportunities = json.load(f)
 
-ranked_opportunities = rank_opportunities(
-    opportunities
-)
+ranked_opportunities = rank_opportunities(opportunities)
 
 top_opportunity = ranked_opportunities[0]
-
-# =====================================
-# CATEGORY COUNTS
-# =====================================
 
 category_counts = {}
 
 for opp in ranked_opportunities:
-
     category = opp["category"]
-
     if category not in category_counts:
         category_counts[category] = 0
-
     category_counts[category] += 1
 
-top_trend = max(
-    category_counts,
-    key=category_counts.get
-)
+top_trend = max(category_counts, key=category_counts.get)
 
-recommendation = generate_recommendation(
-    top_opportunity,
-    top_trend
-)
+recommendation = generate_recommendation(top_opportunity, top_trend)
 
 pain_counts = {}
 
 for opp in ranked_opportunities:
-
     pain = opp["pain_type"]
-
     if pain not in pain_counts:
         pain_counts[pain] = 0
-
     pain_counts[pain] += 1
 
+# =====================================================================
+# SHARED RENDER HELPERS
+# =====================================================================
 
-# =====================================
-# SIDEBAR STATS
-# =====================================
+def score_tier(score: float):
+    """Returns (label, css_class, hex_color) for a given opportunity score."""
+    if score >= 70:
+        return "High", "tier-high", "#34d399"
+    if score >= 50:
+        return "Medium", "tier-medium", "#fbbf67"
+    return "Low", "tier-low", "#fb7185"
 
-st.sidebar.markdown("---")
 
-st.sidebar.markdown(
-    f"""
-**Version:** 0.1
+def tag_html(label: str, color: str = None) -> str:
+    style = f' style="color:{color}"' if color else ""
+    dot = f'<span class="tag-dot"{style}></span>' if color else ""
+    return f'<span class="tag"{style}>{dot}{label}</span>'
 
-**Data Source:** Founder Dataset
 
-**Opportunities:** {len(ranked_opportunities)}
+def score_ring_html(score: float, size: int = 128, label: str = "OPPORTUNITY SCORE") -> str:
+    _, _, color = score_tier(score)
+    pct = max(0, min(100, score))
+    return f"""
+    <div class="score-ring-wrap">
+      <div class="score-ring" style="--pct:{pct};--ring-color:{color};--ring-size:{size}px;">
+        <div class="score-ring-inner">
+          <div class="score-ring-value">{score:.0f}</div>
+          <div class="score-ring-max">/ 100</div>
+        </div>
+      </div>
+      <div class="score-ring-label">{label}</div>
+    </div>
+    """
 
-**Categories:** {len(category_counts)}
-"""
-)
 
-st.sidebar.markdown("---")
+def score_bar_html(score: float) -> str:
+    _, _, color = score_tier(score)
+    pct = max(0, min(100, score))
+    return f"""
+    <div class="score-bar-wrap">
+      <div class="score-bar-track"><div class="score-bar-fill" style="width:{pct}%;--ring-color:{color};"></div></div>
+      <div class="score-bar-value">{score:.0f}</div>
+    </div>
+    """
 
-# =====================================
+
+def render_hero(top_opp: dict, rec: dict, trend: str) -> None:
+    tier_label, tier_class, _ = score_tier(top_opp["opportunity_score"])
+    pain_color = PAIN_COLORS.get(top_opp["pain_type"], PAIN_COLORS["Unknown"])
+    render_html(f"""
+        <div class="hero">
+          <div class="hero-grid">
+            <div class="hero-body">
+              <span class="eyebrow">⭑ Featured Opportunity of the Week</span>
+              <div class="hero-problem">{top_opp['problem']}</div>
+              <div class="hero-meta">
+                {tag_html(top_opp['category'])}
+                {tag_html(top_opp['pain_type'], pain_color)}
+                <span class="tier-pill {tier_class}">{tier_label} PRIORITY</span>
+              </div>
+              <div class="hero-insight">
+                <b>AI Insight —</b> this opportunity leads a broader trend in
+                <b>{trend}</b>. The recommended move: build
+                <b>{rec['startup_idea']}</b> for {rec['target_customer'].lower()}.
+              </div>
+            </div>
+            {score_ring_html(top_opp['opportunity_score'])}
+          </div>
+        </div>
+        """)
+
+
+def render_kpis(ranked: list, top_opp: dict, categories: dict, ai_calls: int) -> None:
+    cards = [
+        ("📈", "Opportunities", len(ranked)),
+        ("🏆", "Top Score", f"{top_opp['opportunity_score']:.0f}"),
+        ("🗂️", "Categories", len(categories)),
+        ("✨", "AI Recommendations", ai_calls),
+    ]
+    cards_html = "".join(
+        f"""
+        <div class="kpi-card">
+          <div class="kpi-top"><div class="kpi-icon">{icon}</div></div>
+          <div class="kpi-label">{label}</div>
+          <div class="kpi-value">{value}</div>
+        </div>
+        """
+        for icon, label, value in cards
+    )
+    render_html(f'<div class="kpi-grid">{cards_html}</div>')
+
+
+def render_featured_opportunity_card(opp: dict) -> None:
+    pain_color = PAIN_COLORS.get(opp["pain_type"], PAIN_COLORS["Unknown"])
+    tier_label, tier_class, _ = score_tier(opp["opportunity_score"])
+    render_html(f"""
+        <div class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+            <div style="flex:1;">
+              <div class="opp-tags" style="margin-bottom:10px;">
+                {tag_html(opp['category'])}
+                {tag_html(opp['pain_type'], pain_color)}
+              </div>
+              <div style="font-size:1.02rem; font-weight:600; color:var(--text-primary); line-height:1.45;">
+                {opp['problem']}
+              </div>
+            </div>
+            <span class="tier-pill {tier_class}">{opp['opportunity_score']:.0f}</span>
+          </div>
+        </div>
+        """)
+
+
+def render_recommendation_card(rec: dict) -> None:
+    diff = rec["difficulty"]
+    diff_class = {"Low": "tier-high", "Medium": "tier-medium", "High": "tier-low"}.get(diff, "tier-medium")
+    render_html(f"""
+        <div class="glass-card">
+          <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:14px;">
+            {rec['startup_idea']}
+          </div>
+          <div class="metric-strip" style="margin-top:0;">
+            <div class="metric-chip">
+              <div class="metric-chip-label">Target Customer</div>
+              <div class="metric-chip-value" style="font-family:var(--font-sans); font-weight:500;">{rec['target_customer']}</div>
+            </div>
+            <div class="metric-chip">
+              <div class="metric-chip-label">Difficulty</div>
+              <span class="tier-pill {diff_class}">{diff}</span>
+            </div>
+          </div>
+          <hr style="margin:14px 0 12px 0;">
+          <div style="font-size:0.86rem; color:var(--text-secondary); line-height:1.55;">
+            <b style="color:var(--text-primary);">Why this opportunity —</b> {rec['reason']}
+          </div>
+        </div>
+        """)
+
+
+def render_opportunity_row(opp: dict, rank: int, is_selected: bool) -> None:
+    pain_color = PAIN_COLORS.get(opp["pain_type"], PAIN_COLORS["Unknown"])
+    selected_class = "is-selected" if is_selected else ""
+    render_html(f"""
+        <div class="opp-row {selected_class}">
+          <div class="opp-rank">#{rank:02d}</div>
+          <div class="opp-main">
+            <div class="opp-problem">{opp['problem']}</div>
+            <div class="opp-tags">
+              {tag_html(opp['category'])}
+              {tag_html(opp['pain_type'], pain_color)}
+            </div>
+          </div>
+          {score_bar_html(opp['opportunity_score'])}
+        </div>
+        """)
+
+
+def render_detail_card(opp: dict) -> None:
+    pain_color = PAIN_COLORS.get(opp["pain_type"], PAIN_COLORS["Unknown"])
+    col_text, col_ring = st.columns([3, 1])
+    with col_text:
+        render_html(f"""
+            <div class="glass-card" style="height:100%;">
+              <div class="opp-tags" style="margin-bottom:12px;">
+                {tag_html(opp['category'])}
+                {tag_html(opp['pain_type'], pain_color)}
+              </div>
+              <div style="font-size:1.05rem; font-weight:600; color:var(--text-primary); line-height:1.5; margin-bottom:16px;">
+                {opp['problem']}
+              </div>
+              <div class="metric-strip">
+                <div class="metric-chip"><div class="metric-chip-label">Severity</div><div class="metric-chip-value">{opp.get('severity', '–')}</div></div>
+                <div class="metric-chip"><div class="metric-chip-label">Frequency</div><div class="metric-chip-value">{opp.get('frequency_estimate', '–')}</div></div>
+                <div class="metric-chip"><div class="metric-chip-label">Willingness to Pay</div><div class="metric-chip-value">{opp.get('willingness_to_pay', '–')}</div></div>
+                <div class="metric-chip"><div class="metric-chip-label">Competition</div><div class="metric-chip-value">{opp.get('competition_level', '–')}</div></div>
+                <div class="metric-chip"><div class="metric-chip-label">Evidence</div><div class="metric-chip-value">{opp.get('evidence_strength', '–')}</div></div>
+              </div>
+            </div>
+            """)
+    with col_ring:
+        render_html(f'<div class="glass-card" style="display:flex; align-items:center; justify-content:center; height:100%;">{score_ring_html(opp["opportunity_score"], size=104, label="SCORE")}</div>')
+
+
+def parse_advice_sections(text: str):
+    """Best-effort split of the Gemini markdown response into ### sections.
+    Falls back to None if the text doesn't follow that shape, so the caller
+    can render it as a single card instead."""
+    if not text or "###" not in text:
+        return None
+    try:
+        parts = re.split(r"\n?###\s*", text.strip())
+        parts = [p for p in parts if p.strip()]
+        sections = []
+        for part in parts:
+            lines = part.strip().split("\n", 1)
+            heading = lines[0].strip().strip("#").strip()
+            body = lines[1].strip() if len(lines) > 1 else ""
+            if heading:
+                sections.append((heading, body))
+        return sections or None
+    except Exception:
+        return None
+
+
+def render_ai_advice(text: str) -> None:
+    sections = parse_advice_sections(text)
+    if not sections:
+        render_html(f'<div class="glass-card">{text}</div>')
+        return
+    for heading, body in sections:
+        icon = ADVICE_ICONS.get(heading.lower(), "▸")
+        render_html(f'<div class="advice-section"><div class="advice-heading">{icon} {heading}</div></div>')
+        render_html(body if body else "—")
+
+
+def render_complaint_result_card(result: dict, idx: int) -> None:
+    score = result.get("opportunity_score", 0)
+    pain = result.get("pain_type", "Unknown")
+    pain_color = PAIN_COLORS.get(pain, PAIN_COLORS["Unknown"])
+    st.markdown(
+        f"""
+        <div class="timeline-item">
+          <div class="glass-card" style="padding:18px 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px;">
+              <div style="flex:1;">
+                <div class="opp-tags" style="margin-bottom:8px;">
+                  {tag_html(result.get('category', 'Unknown'))}
+                  {tag_html(pain, pain_color)}
+                </div>
+                <div style="font-size:0.94rem; font-weight:600; color:var(--text-primary); line-height:1.45;">
+                  {result.get('problem', '')}
+                </div>
+              </div>
+              <span class="tier-pill {score_tier(score)[1]}">{score:.0f}</span>
+            </div>
+            <div class="metric-strip">
+              <div class="metric-chip"><div class="metric-chip-label">Severity</div><div class="metric-chip-value">{result.get('severity', '–')}</div></div>
+              <div class="metric-chip"><div class="metric-chip-label">Frequency</div><div class="metric-chip-value">{result.get('frequency_estimate', '–')}</div></div>
+              <div class="metric-chip"><div class="metric-chip-label">Willingness</div><div class="metric-chip-value">{result.get('willingness_to_pay', '–')}</div></div>
+              <div class="metric-chip"><div class="metric-chip-label">Competition</div><div class="metric-chip-value">{result.get('competition_level', '–')}</div></div>
+              <div class="metric-chip"><div class="metric-chip-label">Evidence</div><div class="metric-chip-value">{result.get('evidence_strength', '–')}</div></div>
+            </div>
+          </div>
+        </div>
+        """)
+
+# =====================================================================
+# SIDEBAR
+# =====================================================================
+
+with st.sidebar:
+    render_html("""
+        <div class="brand">
+          <div class="brand-mark">🚀</div>
+          <div>
+            <div class="brand-name">Founder Intelligence</div>
+            <div class="brand-tag">AI Opportunity Engine</div>
+          </div>
+        </div>
+        """)
+
+    render_html('<div class="nav-label">Navigate</div>')
+
+    page = st.radio(
+        "Navigation",
+        options=NAV_ITEMS,
+        format_func=lambda p: f"{NAV_ICONS.get(p, '')}  {p}",
+        label_visibility="collapsed",
+    )
+
+    render_html('<div class="sidebar-divider"></div>')
+
+    render_html(f"""
+        <div class="sidebar-stats">
+          <div class="stat-row"><span>Version</span><span>0.1</span></div>
+          <div class="stat-row"><span>Data Source</span><span>Founder Dataset</span></div>
+          <div class="stat-row"><span>Opportunities</span><span>{len(ranked_opportunities)}</span></div>
+          <div class="stat-row"><span>Categories</span><span>{len(category_counts)}</span></div>
+        </div>
+        """)
+
+# =====================================================================
 # DASHBOARD PAGE
-# =====================================
+# =====================================================================
 
 if page == "Dashboard":
 
-    st.markdown("""
-# 🚀 Founder Intelligence Platform
+    render_hero(top_opportunity, recommendation, top_trend)
+    render_kpis(ranked_opportunities, top_opportunity, category_counts, st.session_state.ai_calls)
 
-### Discover startup opportunities from founder pain points using AI
-""")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "📈 Opportunities",
-        len(ranked_opportunities)
-    )
-
-    col2.metric(
-        "🏆 Top Score",
-        top_opportunity["opportunity_score"]
-    )
-
-    col3.metric(
-        "🔥 Categories",
-        len(category_counts)
-    )
-
-    st.divider()
-
-    left, right = st.columns(2)
+    left, right = st.columns([1.15, 0.85], gap="large")
 
     with left:
+        render_html('<p class="section-title">📊 Intelligence Overview</p>')
+        tab_cat, tab_pain = st.tabs(["By Category", "By Pain Type"])
 
-        st.subheader("🔥 Top Trend")
+        with tab_cat:
+            category_df = pd.DataFrame(
+                {"Category": list(category_counts.keys()), "Mentions": list(category_counts.values())}
+            )
+            st.bar_chart(category_df.set_index("Category"), color="#6D5DFB")
 
-        st.success(top_trend)
+        with tab_pain:
+            pain_df = pd.DataFrame(
+                {"Pain Type": list(pain_counts.keys()), "Count": list(pain_counts.values())}
+            )
+            st.bar_chart(pain_df.set_index("Pain Type"), color="#22D3EE")
 
-        st.subheader("📊 Category Breakdown")
-
-        category_df = pd.DataFrame(
-            {
-                "Category": list(category_counts.keys()),
-                "Mentions": list(category_counts.values())
-            }
-        )
-
-        st.bar_chart(
-            category_df.set_index("Category")
-        )
-
-        st.subheader("🎯 Pain Type Distribution")
-
-        pain_df = pd.DataFrame(
-            {
-                "Pain Type": list(pain_counts.keys()),
-                "Count": list(pain_counts.values())
-            }
-        )
-
-        st.bar_chart(
-            pain_df.set_index("Pain Type")
-        )
+        render_html('<p class="section-title">🏆 Featured Opportunity</p>')
+        render_featured_opportunity_card(top_opportunity)
 
     with right:
+        render_html('<p class="section-title">🤖 Founder Recommendation</p>')
+        render_recommendation_card(recommendation)
 
-        st.subheader("🤖 Recommended Startup")
-
-        st.markdown(
-    f"""
-### {recommendation['startup_idea']}
-
-**Target Customer**
-
-{recommendation['target_customer']}
-
-**Difficulty**
-
-{recommendation['difficulty']}
-
-**Why This Opportunity?**
-
-{recommendation['reason']}
-"""
-)
-
-# =====================================
-# OPPORTUNITIES PAGE
-# =====================================
+# =====================================================================
+# OPPORTUNITIES PAGE  (Intelligence Terminal)
+# =====================================================================
 
 if page == "Opportunities":
 
-    st.title("📋 Opportunity Rankings")
+    render_html('<p class="page-title">📋 Opportunity Explorer</p>')
+    render_html('<p class="page-subtitle">Filter, rank, and drill into founder pain points scored by the engine.</p>')
 
-    rankings_df = pd.DataFrame(
-        ranked_opportunities
-    )
+    rankings_df = pd.DataFrame(ranked_opportunities)
 
-    selected_category = st.selectbox(
-    "Category",
-    ["All"] + sorted(
-        rankings_df["category"].unique()
-    )
-    )
-
-    selected_pain = st.selectbox(
-    "Pain Type",
-    ["All"] + sorted(
-        rankings_df["pain_type"].unique()
-    )
-    )
-
-    minimum_score = st.slider(
-    "Minimum Score",
-    0,
-    100,
-    50
-)
+    render_html('<div class="filter-bar">')
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        selected_category = st.selectbox("Category", ["All"] + sorted(rankings_df["category"].unique()))
+    with f2:
+        selected_pain = st.selectbox("Pain Type", ["All"] + sorted(rankings_df["pain_type"].unique()))
+    with f3:
+        minimum_score = st.slider("Minimum Score", 0, 100, 50)
+    render_html("</div>")
 
     filtered_df = rankings_df.copy()
 
     if selected_category != "All":
-
-        filtered_df = filtered_df[
-            filtered_df["category"]== selected_category]
+        filtered_df = filtered_df[filtered_df["category"] == selected_category]
 
     if selected_pain != "All":
+        filtered_df = filtered_df[filtered_df["pain_type"] == selected_pain]
 
-        filtered_df = filtered_df[
-            filtered_df["pain_type"]== selected_pain
-    ]
+    filtered_df = filtered_df[filtered_df["opportunity_score"] >= minimum_score]
 
-    filtered_df = filtered_df[
-        filtered_df["opportunity_score"]>= minimum_score]
-
-    st.divider()
-
-    st.subheader("🔍 Opportunity Explorer")
+    render_html(f'<p class="result-count">{len(filtered_df)} opportunit{"y" if len(filtered_df) == 1 else "ies"} match your filters</p>')
 
     if len(filtered_df) > 0:
 
-        selected_problem = st.selectbox(
-            "Select an Opportunity",
-            filtered_df["problem"].tolist()
-        )
+        filtered_problems = filtered_df["problem"].tolist()
+        filtered_opportunities = [opp for opp in ranked_opportunities if opp["problem"] in filtered_problems]
+
+        # keep selection valid as filters change, defaulting to the top match
+        if st.session_state.selected_problem not in filtered_problems:
+            st.session_state.selected_problem = filtered_problems[0]
+
+        render_html('<p class="section-title">🔍 Ranked Results</p>')
+
+        for idx, opp in enumerate(filtered_opportunities, start=1):
+            is_selected = st.session_state.selected_problem == opp["problem"]
+            row_col, btn_col = st.columns([9, 1.1])
+            with row_col:
+                render_opportunity_row(opp, idx, is_selected)
+            with btn_col:
+                if st.button("✓ Selected" if is_selected else "Select", key=f"select_{idx}"):
+                    st.session_state.selected_problem = opp["problem"]
+                    st.rerun()
+
+        st.divider()
 
         selected_opportunity = next(
-            opp
-            for opp in ranked_opportunities
-            if opp["problem"] == selected_problem
+            opp for opp in ranked_opportunities if opp["problem"] == st.session_state.selected_problem
         )
 
-        st.info(
-            f"""
-Problem:
-{selected_opportunity['problem']}
+        render_html('<p class="section-title">🧠 Opportunity Detail</p>')
+        render_detail_card(selected_opportunity)
 
-Category:
-{selected_opportunity['category']}
+        render_html("<div style='height:14px;'></div>")
 
-Pain Type:
-{selected_opportunity['pain_type']}
-
-Opportunity Score:
-{selected_opportunity['opportunity_score']}
-"""
-        )
-
-        if st.button("Generate Startup Analysis"):
-
-            with st.spinner(
-                "Analyzing opportunity..."
-            ):
-
+        if st.button("✨ Generate Startup Analysis", type="primary"):
+            with st.spinner("Analyzing opportunity..."):
                 try:
-
-                    analysis = generate_ai_advice(
-                        selected_opportunity
-                    )
-
+                    analysis = generate_ai_advice(selected_opportunity)
+                    st.session_state.ai_calls += 1
                 except Exception:
-
                     analysis = """
 ### Startup Idea
 AI Customer Discovery Platform
@@ -304,50 +533,36 @@ Customer research remains one of the most time-consuming founder activities.
 ### Go-To-Market
 Partner with startup communities and accelerators.
 """
-
-                st.markdown(analysis)
+            render_html('<p class="section-title">📄 Startup Analysis</p>')
+            render_ai_advice(analysis)
 
     else:
+        render_html("""
+            <div class="empty-state">
+              <div class="empty-state-icon">🔍</div>
+              No opportunities match the selected filters. Try widening the score range or category.
+            </div>
+            """)
 
-        st.warning(
-            "No opportunities match the selected filters."
-        )
-
-# =====================================
+# =====================================================================
 # AI ADVISOR PAGE
-# =====================================
+# =====================================================================
 
 if page == "AI Advisor":
 
-    st.title("🤖 AI Founder Advisor")
+    render_html('<p class="page-title">🤖 AI Founder Advisor</p>')
+    render_html('<p class="page-subtitle">An always-on AI consultant analyzing your highest-ranked opportunity.</p>')
 
-    st.subheader(
-        "Top Opportunity"
-    )
+    render_html('<p class="section-title">📌 Executive Summary</p>')
+    render_detail_card(top_opportunity)
 
-    st.info(
-        top_opportunity["problem"]
-    )
-
-    st.metric(
-        "Opportunity Score",
-        top_opportunity["opportunity_score"]
-    )
-
-    st.subheader(
-        "AI Startup Recommendation"
-    )
+    render_html('<p class="section-title">🚀 AI Startup Recommendation</p>')
 
     try:
-
-        ai_advice = generate_ai_advice(
-            top_opportunity
-        )
-
+        ai_advice = generate_ai_advice(top_opportunity)
+        st.session_state.ai_calls += 1
     except Exception as e:
-
         print("Dashboard Error:", e)
-
         ai_advice = """
 ### Startup Idea
 AI Customer Discovery Platform
@@ -365,70 +580,53 @@ Customer research and interview analysis remain time-consuming for founders.
 Partner with startup communities and accelerators.
 """
 
-    st.markdown(ai_advice)
+    render_html('<div class="glass-card">')
+    render_ai_advice(ai_advice)
+    render_html("</div>")
 
-# =====================================
-# ANALYZE COMPLAINTS PAGE
-# =====================================
+# =====================================================================
+# ANALYZE COMPLAINTS PAGE  (AI Workspace)
+# =====================================================================
 
 if page == "Analyze Complaints":
 
-    st.title("📝 Analyze Founder Complaints")
-
-    st.write(
-        "Paste founder complaints below, one per line."
-    )
+    render_html('<p class="page-title">📝 Analyze Founder Complaints</p>')
+    render_html('<p class="page-subtitle">Paste raw founder complaints — one per line — and let AI structure them into scored opportunities.</p>')
 
     complaints_text = st.text_area(
         "Founder Complaints",
-        height=250,
-        placeholder="""
-Customer interviews take forever
-Finding early adopters is difficult
-Competitor pricing changes constantly
-"""
+        height=220,
+        placeholder="Customer interviews take forever\nFinding early adopters is difficult\nCompetitor pricing changes constantly",
+        label_visibility="collapsed",
     )
 
-    if st.button(
-        "Analyze Complaints"
-    ):
+    run_analysis = st.button("⚡ Analyze Complaints", type="primary")
+
+    if run_analysis:
 
         if complaints_text.strip():
 
-            complaints = [
-                line.strip()
-                for line in complaints_text.split("\n")
-                if line.strip()
-            ]
+            complaints = [line.strip() for line in complaints_text.split("\n") if line.strip()]
 
             results = []
+            progress = st.progress(0, text="Analyzing complaints...")
 
-            for complaint in complaints:
-
+            for i, complaint in enumerate(complaints):
                 result = analyze_complaint(complaint)
-
+                st.session_state.ai_calls += 1
                 results.append(result)
+                progress.progress((i + 1) / len(complaints), text=f"Analyzed {i + 1}/{len(complaints)}")
 
-            for result in results:
+            progress.empty()
 
-                st.subheader("Analysis")
-
-                st.json(result)
-
-            st.subheader(
-                "Preview"
-            )
-
-            for complaint in complaints:
-
-                st.write(
-                    f"• {complaint}"
-                )
+            st.session_state.complaint_results = results
 
             st.success("Opportunity analysis completed successfully.")
 
         else:
+            st.warning("Please enter at least one complaint.")
 
-            st.warning(
-                "Please enter at least one complaint."
-            )
+    if st.session_state.complaint_results:
+        render_html('<p class="section-title">🧠 Analysis Timeline</p>')
+        for i, result in enumerate(st.session_state.complaint_results, start=1):
+            render_complaint_result_card(result, i)
