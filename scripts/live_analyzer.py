@@ -18,9 +18,23 @@ client = genai.Client(
 def analyze_complaint(complaint):
 
     prompt = f"""
-You are a startup analyst.
+You are an elite startup analyst.
+
+Analyze the complaint.
+
+Identify:
+
+1. Core problem
+2. Startup opportunity
+3. Best target customer
+4. Recommended pricing model
+5. Lean MVP idea
 
 Return ONLY valid JSON.
+
+Startup ideas should be realistic,
+software-first,
+and achievable by a small startup team.
 
 Schema:
 
@@ -28,6 +42,12 @@ Schema:
     "problem": "",
     "category": "",
     "pain_type": "",
+
+    "startup_idea": "",
+    "target_customer": "",
+    "pricing_model": "",
+    "mvp_description": "",
+
     "severity": 0,
     "frequency_estimate": 0,
     "willingness_to_pay": 0,
@@ -65,6 +85,16 @@ Complaint:
 
         data = json.loads(cleaned)
 
+        required_fields = [
+            "startup_idea",
+            "target_customer",
+            "pricing_model",
+            "mvp_description"
+        ]
+
+        for field in required_fields:
+            data.setdefault(field, "")
+
         score = calculate_opportunity_score(
             data
         )
@@ -75,16 +105,23 @@ Complaint:
 
     except Exception as e:
 
-        print("Analyzer Error:", e)
+            print("Analyzer Error:", e)
 
-        return {
+            return {
             "problem": complaint,
             "category": "Unknown",
             "pain_type": "Unknown",
-            "severity": 5,
-            "frequency_estimate": 5,
-            "willingness_to_pay": 5,
-            "competition_level": 5,
-            "evidence_strength": 5,
-            "opportunity_score": 50
+
+            "startup_idea": "Unknown",
+            "target_customer": "Unknown",
+            "pricing_model": "Unknown",
+            "mvp_description": "Unknown",
+
+            "severity": 1,
+            "frequency_estimate": 1,
+            "willingness_to_pay": 1,
+            "competition_level": 10,
+            "evidence_strength": 1,
+
+            "opportunity_score": 0
         }

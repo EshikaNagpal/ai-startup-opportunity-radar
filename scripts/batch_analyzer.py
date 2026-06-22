@@ -1,14 +1,8 @@
-import os
 import json
-from dotenv import load_dotenv
-from google import genai
-from ranking_engine import rank_opportunities
-load_dotenv()
-
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
-
+import time
+from scripts.live_analyzer import analyze_complaint
+from scripts.ranking_engine import rank_opportunities
+from scripts.trend_tracker import save_snapshot
 INPUT_FILE = "data/raw/founder_complaints.txt"
 
 print(f"\nLoading data from: {INPUT_FILE}\n")
@@ -18,6 +12,7 @@ with open(
     "r",
     encoding="utf-8"
 ) as f:
+
     complaints = [
         line.strip()
         for line in f.readlines()
@@ -28,84 +23,43 @@ results = []
 
 for complaint in complaints:
 
-    prompt = f"""
-        You are a startup analyst.
-
-        Return ONLY valid JSON.
-
-        Return EXACTLY this schema:
-
-    {{
-        "problem": "",
-        "category": "",
-        "pain_type": "",
-        "severity": 0,
-        "frequency_estimate": 0,
-        "willingness_to_pay": 0,
-        "competition_level": 0,
-        "evidence_strength": 0
-    }}
-
-    pain_type must be exactly one of:
-    Time
-    Money
-    Productivity
-    Trust
-    Compliance
-    Emotional
-
-    Do not include:
-    - reasoning
-    - explanations
-    - notes
-    - opportunity_score
-    - markdown
-    - code fences
-    
-
-    target_customer should identify the primary affected customer segment.
-
-Examples:
-- Startup Founders
-- Product Managers
-- SaaS Companies
-- Small Businesses
-- Freelancers
-- Recruiters
-- Students
-
-Complaint:
-{complaint}
-"""
-
     try:
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
-            contents=prompt
+        data = analyze_complaint(
+            complaint
         )
-
-        cleaned = (
-            response.text
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
-
-        data = json.loads(cleaned)
 
         results.append(data)
 
-
-        print(f"Processed: {complaint}")
+        print(
+            f"Processed: {complaint}"
+        )
+        time.sleep(7)
 
     except Exception as e:
 
-        print(f"Failed: {complaint}")
+        print(
+            f"Failed: {complaint}"
+        )
+
         print(e)
-ranked_results = rank_opportunities(results)
+
+ranked_results = rank_opportunities(
+    results
+)
+
 print("\nRANKED RESULTS:")
-print(json.dumps(ranked_results, indent=4))
+
+print(
+    json.dumps(
+        ranked_results,
+        indent=4
+    )
+)
+
+print(f"Saving {len(ranked_results)} opportunities")
+
+save_snapshot(ranked_results)
 
 with open(
     "data/processed/opportunities.json",
@@ -113,6 +67,13 @@ with open(
     encoding="utf-8"
 ) as f:
 
-    json.dump(ranked_results, f, indent=4)
+    json.dump(
+        ranked_results,
+        f,
+        indent=4,
+        ensure_ascii=False
+    )
 
-print(f"\nSaved {len(results)} opportunities.")
+print(
+    f"\nSaved {len(ranked_results)} opportunities."
+)
