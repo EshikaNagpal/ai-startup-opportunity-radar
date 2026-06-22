@@ -1167,6 +1167,59 @@ fig,
 use_container_width=True
 )
 
+
+# ========================================
+
+# FOUNDER INSIGHTS
+
+# ========================================
+
+st.divider()
+
+st.markdown("## 🧠 Founder Insights")
+
+highest_revenue = max(
+saved_opportunities,
+key=lambda x: x["willingness_to_pay"]
+)
+
+lowest_competition = min(
+saved_opportunities,
+key=lambda x: x["competition_level"]
+)
+
+most_frequent_pain = max(
+saved_opportunities,
+key=lambda x: x["frequency_estimate"]
+)
+
+most_severe_problem = max(
+saved_opportunities,
+key=lambda x: x["severity"]
+)
+
+c1, c2 = st.columns(2)
+
+with c1:
+
+
+    st.info(
+    f"💰 Highest Revenue Potential\n\n"
+    f"{highest_revenue['category']}"
+)
+
+
+with c2:
+
+
+    st.info(
+    f"🎯 Lowest Competition\n\n"
+    f"{lowest_competition['category']}"
+)
+
+
+
+
 # ========================================
 
 # FOUNDER REPORT EXPORT
